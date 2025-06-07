@@ -194,6 +194,7 @@
         for (let i = 1; i <= datesLancements.length; i++) {
             const dateReelle = new Date(datesLancements[i - 1]);
             const datePredite = calculerDatePredite(i, regression);
+            // Calculer l'écart entre la date réelle et la date prédite
             const ecart = calculerEcartJours(datePredite, dateReelle);
             predictionsPassees.push({
                 numero: i,
@@ -216,12 +217,13 @@
             // Ajouter l'écart avec le vol précédent
             if (pred.numero > 1) {
                 const datePrecedente = new Date(datesLancements[pred.numero - 2]);
-                const ecart = calculerEcartJours(datePrecedente, pred.dateReelle);
-                texte += ` (${ecart} jours après le vol précédent)`;
+                const ecartPrecedent = calculerEcartJours(datePrecedente, pred.dateReelle);
+                texte += ` (${ecartPrecedent} jours après le vol précédent)`;
             }
             
             // Ajouter l'écart avec la prédiction
-            texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${pred.ecart} jours]`;
+            const signeEcart = pred.ecart > 0 ? '+' : '';
+            texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
             
             div.textContent = texte;
             datesContainer.appendChild(div);
@@ -237,8 +239,8 @@
             const datePrecedente = index === 0 ? 
                 new Date(datesLancements[datesLancements.length - 1]) : 
                 predictions[index - 1].date;
-            const ecart = calculerEcartJours(datePrecedente, pred.date);
-            texte += ` (${ecart} jours après le vol précédent)`;
+            const ecartPrecedent = calculerEcartJours(datePrecedente, pred.date);
+            texte += ` (${ecartPrecedent} jours après le vol précédent)`;
             
             div.textContent = texte;
             predictionsContainer.appendChild(div);
