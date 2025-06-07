@@ -208,7 +208,7 @@
             
             // Calculer la régression basée sur les vols précédents
             let datePredite;
-            if (i <= 2) {
+            if (i <= derniersPoints) {
                 // Pas de prédiction pour les deux premiers vols
                 datePredite = dateReelle;
             } else {
@@ -247,7 +247,7 @@
             }
             
             // Ajouter l'écart avec la prédiction seulement à partir du troisième vol
-            if (pred.numero > 3) {
+            if (pred.numero > derniersPoints) {
                 const signeEcart = pred.ecart > 0 ? '+' : '';
                 texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
             }
