@@ -84,7 +84,7 @@
         });
 
         // Prendre les 3 derniers points pour la régression
-        const derniersPoints = 5;
+        const derniersPoints = 2;
         const derniersJours = joursDepuisPremier.slice(-derniersPoints);
         const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
 
@@ -92,6 +92,14 @@
         function calculerRegressionLogarithmique(x, y) {
             const n = x.length;
             let sumLnX = 0, sumY = 0, sumLnXY = 0, sumLnX2 = 0;
+            
+            // Vérifier que toutes les valeurs sont valides
+            for (let i = 0; i < n; i++) {
+                if (x[i] <= 0) {
+                    console.error(`Valeur invalide pour le calcul logarithmique: ${x[i]}`);
+                    return { a: 0, b: 0 };
+                }
+            }
             
             for (let i = 0; i < n; i++) {
                 const lnX = Math.log(x[i]);
@@ -185,6 +193,10 @@
 
         // Fonction pour calculer la date prédite pour un vol donné
         function calculerDatePredite(numeroVol, regression) {
+            if (regression.a === 0 && regression.b === 0) {
+                // Retourner une date par défaut si la régression n'est pas valide
+                return new Date(datesObj[0].getTime() + (numeroVol * 30 * 24 * 60 * 60 * 1000));
+            }
             const joursPredits = Math.exp((numeroVol - regression.b) / regression.a);
             return new Date(datesObj[0].getTime() + joursPredits * 24 * 60 * 60 * 1000);
         }
@@ -193,7 +205,20 @@
         const predictionsPassees = [];
         for (let i = 1; i <= datesLancements.length; i++) {
             const dateReelle = new Date(datesLancements[i - 1]);
-            const datePredite = calculerDatePredite(i, regression);
+            
+            // Calculer la régression basée sur les vols précédents
+            let datePredite;
+            if (i <= 2) {
+                // Pas de prédiction pour les deux premiers vols
+                datePredite = dateReelle;
+            } else {
+                // Pour les vols suivants, utiliser les 3 derniers vols précédents
+                const joursPrecedents = joursDepuisPremier.slice(0, i - 1).slice(-derniersPoints);
+                const yPrecedents = Array.from({length: derniersPoints}, (_, j) => i - derniersPoints + j);
+                const regressionPrecedente = calculerRegressionLogarithmique(joursPrecedents, yPrecedents);
+                datePredite = calculerDatePredite(i, regressionPrecedente);
+            }
+            
             // Calculer l'écart entre la date réelle et la date prédite
             const ecart = calculerEcartJours(datePredite, dateReelle);
             predictionsPassees.push({
@@ -221,9 +246,11 @@
                 texte += ` (${ecartPrecedent} jours après le vol précédent)`;
             }
             
-            // Ajouter l'écart avec la prédiction
-            const signeEcart = pred.ecart > 0 ? '+' : '';
-            texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
+            // Ajouter l'écart avec la prédiction seulement à partir du troisième vol
+            if (pred.numero > 3) {
+                const signeEcart = pred.ecart > 0 ? '+' : '';
+                texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
+            }
             
             div.textContent = texte;
             datesContainer.appendChild(div);
