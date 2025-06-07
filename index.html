@@ -79,71 +79,81 @@
         // Convertir les dates en objets Date
         const datesObj = datesLancements.map(date => new Date(date));
 
-        // Calculer les jours depuis le premier lancement
-        const joursDepuisPremier = datesObj.map((date, index) => {
-            if (index === 0) return 0;
-            return Math.floor((date - datesObj[index - 1]) / (1000 * 60 * 60 * 24));
+        // Calculer les jours depuis le vol précédent
+        const joursDepuisPrecedent = datesObj.map((date, index) => {
+            if (index === 0) return 1;
+            return Math.max(1, Math.floor((date - datesObj[index - 1]) / (1000 * 60 * 60 * 24)));
         });
 
-        // Prendre les 3 derniers points pour la régression
-        const derniersPoints = Math.round(Math.sqrt(datesLancements.length));
-        const derniersJours = joursDepuisPremier.slice(-derniersPoints);
-        const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
+        // Prendre les derniers points pour la prédiction
+        const derniersPoints = 5;
+        const derniersJours = joursDepuisPrecedent.slice(-derniersPoints);
 
-        // Fonction pour calculer la régression logarithmique
-        function calculerRegressionLogarithmique(x, y) {
-            const n = x.length;
-            let sumLnX = 0, sumY = 0, sumLnXY = 0, sumLnX2 = 0;
+        // Fonction pour calculer la moyenne pondérée des derniers écarts
+        function calculerMoyennePonderee(jours) {
+            if (jours.length === 0) return 30; // Valeur par défaut
             
-            // Vérifier que toutes les valeurs sont valides
-            for (let i = 0; i < n; i++) {
-                if (x[i] <= 0) {
-                    console.error(`Valeur invalide pour le calcul logarithmique: ${x[i]}`);
-                    return { a: 0, b: 0 };
-                }
-            }
+            // Donner plus de poids aux écarts récents
+            const poids = jours.map((_, index) => Math.abs(jours[index] - (index > 0 ? jours[index - 1] : jours[0])));
+            const sommePoids = poids.reduce((a, b) => a + b, 0);
             
-            for (let i = 0; i < n; i++) {
-                const lnX = Math.log(x[i]);
-                sumLnX += lnX;
-                sumY += y[i];
-                sumLnXY += lnX * y[i];
-                sumLnX2 += lnX * lnX;
-            }
-            
-            const a = (n * sumLnXY - sumLnX * sumY) / (n * sumLnX2 - sumLnX * sumLnX);
-            const b = (sumY - a * sumLnX) / n;
-            
-            return { a, b };
+            return jours.reduce((acc, jour, index) => {
+                return acc + (jour * poids[index] / sommePoids);
+            }, 0);
         }
 
-        // Calculer la régression avec les 3 derniers points
-        const regression = calculerRegressionLogarithmique(derniersJours, derniersY);
+        // Fonction pour calculer la date prédite pour un vol donné
+        function calculerDatePredite(numeroVol, datePrecedente) {
+            const moyennePonderee = calculerMoyennePonderee(derniersJours);
+            return new Date(datePrecedente.getTime() + moyennePonderee * 24 * 60 * 60 * 1000);
+        }
 
-        // Prédire les dates jusqu'au 9ème vol
+        // Calculer les prédictions pour les vols passés
+        const predictionsPassees = [];
+        for (let i = 1; i <= datesLancements.length; i++) {
+            const dateReelle = new Date(datesLancements[i - 1]);
+            
+            // Calculer la prédiction basée sur les vols précédents
+            let datePredite;
+            if (i <= derniersPoints) {
+                // Pas de prédiction pour les premiers vols
+                datePredite = dateReelle;
+            } else {
+                // Pour les vols suivants, utiliser les derniers points disponibles
+                const joursPrecedents = joursDepuisPrecedent.slice(0, i - 1).slice(-derniersPoints);
+                const datePrecedente = new Date(datesLancements[i - 2]);
+                datePredite = calculerDatePredite(i, datePrecedente);
+            }
+            
+            // Calculer l'écart entre la date réelle et la date prédite
+            const ecart = calculerEcartJours(datePredite, dateReelle);
+            predictionsPassees.push({
+                numero: i,
+                dateReelle: dateReelle,
+                datePredite: datePredite,
+                ecart: ecart
+            });
+        }
+
+        // Prédire les dates futures
         const predictions = [];
         const dernierVol = datesLancements.length;
-        const nombreVolsPredits = 9;
+        const nombreVolsPredits = 1;
         const dernierVolTotal = dernierVol + nombreVolsPredits;
 
-        // Fonction pour mettre à jour la régression avec les nouvelles prédictions
-        function mettreAJourRegression(derniersJours, derniersY) {
-            return calculerRegressionLogarithmique(derniersJours, derniersY);
-        }
-
-        // Générer les prédictions en mettant à jour la régression à chaque fois
-        let joursPredits = [...joursDepuisPremier];
-        let yPredits = Array.from({length: datesLancements.length}, (_, i) => i + 1);
+        // Générer les prédictions en mettant à jour la moyenne à chaque fois
+        let derniersJoursActuels = [...joursDepuisPrecedent];
 
         for (let i = dernierVol; i < dernierVolTotal; i++) {
-            // Calculer la régression avec les 3 derniers points
-            const derniersJoursActuels = joursPredits.slice(-derniersPoints);
-            const derniersYActuels = yPredits.slice(-derniersPoints);
-            const regressionActuelle = mettreAJourRegression(derniersJoursActuels, derniersYActuels);
+            // Calculer la moyenne pondérée avec les derniers points
+            const derniersJoursPrediction = derniersJoursActuels.slice(-derniersPoints);
+            const moyenneActuelle = calculerMoyennePonderee(derniersJoursPrediction);
 
-            // Prédire le prochain vol avec la formule logarithmique: y = a * ln(x) + b
-            const joursProchainVol = Math.exp((i + 1 - regressionActuelle.b) / regressionActuelle.a);
-            const datePredite = new Date(datesObj[0].getTime() + joursProchainVol * 24 * 60 * 60 * 1000);
+            // Prédire le prochain vol
+            const datePrecedente = i === dernierVol ? 
+                new Date(datesLancements[datesLancements.length - 1]) : 
+                predictions[predictions.length - 1].date;
+            const datePredite = new Date(datePrecedente.getTime() + moyenneActuelle * 24 * 60 * 60 * 1000);
             
             predictions.push({
                 numero: i + 1,
@@ -151,27 +161,27 @@
             });
 
             // Mettre à jour les tableaux pour la prochaine itération
-            joursPredits.push(joursProchainVol);
-            yPredits.push(i + 1);
+            const joursDepuisDernier = Math.floor((datePredite - datePrecedente) / (1000 * 60 * 60 * 24));
+            derniersJoursActuels.push(joursDepuisDernier);
         }
 
-        // Fonction pour calculer les points de la courbe de régression
-        function calculerPointsRegression(debut, fin, regression) {
+        // Fonction pour calculer les points de la courbe de tendance
+        function calculerPointsTendance(debut, fin, datePrecedente) {
             const points = [];
             const pas = (fin - debut) / 100; // 100 points pour une courbe fluide
+            const moyennePonderee = calculerMoyennePonderee(derniersJours);
             
-            // Commencer exactement au premier point
+            // Commencer exactement au point précédent
             points.push({
-                x: datesObj[0],
-                y: 1
+                x: datePrecedente,
+                y: debut
             });
             
             // Ajouter les points intermédiaires
             for (let x = debut + pas; x <= fin; x += pas) {
-                const y = regression.a * Math.log(x) + regression.b;
                 points.push({
-                    x: new Date(datesObj[0].getTime() + x * 24 * 60 * 60 * 1000),
-                    y: y
+                    x: new Date(datePrecedente.getTime() + moyennePonderee * 24 * 60 * 60 * 1000),
+                    y: x
                 });
             }
             return points;
@@ -191,44 +201,6 @@
         // Fonction pour calculer l'écart en jours entre deux dates
         function calculerEcartJours(date1, date2) {
             return Math.floor((date2 - date1) / (1000 * 60 * 60 * 24));
-        }
-
-        // Fonction pour calculer la date prédite pour un vol donné
-        function calculerDatePredite(numeroVol, regression) {
-            if (regression.a === 0 && regression.b === 0) {
-                // Retourner une date par défaut si la régression n'est pas valide
-                return new Date(datesObj[0].getTime() + (numeroVol * 30 * 24 * 60 * 60 * 1000));
-            }
-            const joursPredits = Math.exp((numeroVol - regression.b) / regression.a);
-            return new Date(datesObj[0].getTime() + joursPredits * 24 * 60 * 60 * 1000);
-        }
-
-        // Calculer les prédictions pour les vols passés
-        const predictionsPassees = [];
-        for (let i = 1; i <= datesLancements.length; i++) {
-            const dateReelle = new Date(datesLancements[i - 1]);
-            
-            // Calculer la régression basée sur les vols précédents
-            let datePredite;
-            if (i <= derniersPoints) {
-                // Pas de prédiction pour les deux premiers vols
-                datePredite = dateReelle;
-            } else {
-                // Pour les vols suivants, utiliser les 3 derniers vols précédents
-                const joursPrecedents = joursDepuisPremier.slice(0, i - 1).slice(-derniersPoints);
-                const yPrecedents = Array.from({length: derniersPoints}, (_, j) => i - derniersPoints + j);
-                const regressionPrecedente = calculerRegressionLogarithmique(joursPrecedents, yPrecedents);
-                datePredite = calculerDatePredite(i, regressionPrecedente);
-            }
-            
-            // Calculer l'écart entre la date réelle et la date prédite
-            const ecart = calculerEcartJours(datePredite, dateReelle);
-            predictionsPassees.push({
-                numero: i,
-                dateReelle: dateReelle,
-                datePredite: datePredite,
-                ecart: ecart
-            });
         }
 
         // Afficher les résultats dans le DOM
@@ -308,11 +280,11 @@
                     })),
                     backgroundColor: 'red'
                 }, {
-                    label: 'Courbe de régression logarithmique',
-                    data: calculerPointsRegression(
-                        joursDepuisPremier[0],
-                        joursPredits[joursPredits.length - 1],
-                        regression
+                    label: 'Courbe de tendance',
+                    data: calculerPointsTendance(
+                        joursDepuisPrecedent[0],
+                        joursDepuisPrecedent[joursDepuisPrecedent.length - 1],
+                        datesObj[0]
                     ),
                     type: 'line',
                     borderColor: 'green',
