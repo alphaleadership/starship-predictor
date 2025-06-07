@@ -84,7 +84,7 @@
         });
 
         // Prendre les 3 derniers points pour la régression
-        const derniersPoints = 3;
+        const derniersPoints = 5;
         const derniersJours = joursDepuisPremier.slice(-derniersPoints);
         const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
 
@@ -113,7 +113,7 @@
         // Prédire les dates jusqu'au 9ème vol
         const predictions = [];
         const dernierVol = datesLancements.length;
-        const nombreVolsPredits = 2;
+        const nombreVolsPredits = 9;
         const dernierVolTotal = dernierVol + nombreVolsPredits;
 
         // Fonction pour mettre à jour la régression avec les nouvelles prédictions
