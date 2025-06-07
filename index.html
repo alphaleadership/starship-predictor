@@ -150,7 +150,14 @@
             const points = [];
             const pas = (fin - debut) / 100; // 100 points pour une courbe fluide
             
-            for (let x = debut; x <= fin; x += pas) {
+            // Commencer exactement au premier point
+            points.push({
+                x: datesObj[0],
+                y: 1
+            });
+            
+            // Ajouter les points intermédiaires
+            for (let x = debut + pas; x <= fin; x += pas) {
                 const y = regression.a * Math.log(x) + regression.b;
                 points.push({
                     x: new Date(datesObj[0].getTime() + x * 24 * 60 * 60 * 1000),
