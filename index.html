@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prédiction du prochain lancement du Starship</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #resultats {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .date-item {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .graphique-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            height: 400px;
+        }
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prédiction des lancements du Starship</h1>
+        <div id="resultats">
+            <h2>Dates des lancements</h2>
+            <div id="dates-lancements"></div>
+            <h2>Prédictions</h2>
+            <div id="predictions"></div>
+        </div>
+        <div class="graphique-container">
+            <canvas id="graphique"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Dates des lancements précédents du Starship
+        const datesLancements = [
+            '2023-04-20',  // Premier vol d'essai
+            '2023-11-18',  // Deuxième vol d'essai
+            '2024-03-14',  // Troisième vol d'essai
+            '2024-06-06',  // Quatrième vol d'essai
+            '2024-10-13',  // Cinquième vol d'essai
+            '2024-11-20',  // Sixième vol d'essai
+            '2025-01-17',  // Septième vol d'essai
+            '2025-03-07',  // Huitième vol d'essai
+            '2025-05-28',  // Neuvième vol d'essai
+        ];
+
+        // Convertir les dates en objets Date
+        const datesObj = datesLancements.map(date => new Date(date));
+
+        // Calculer les jours depuis le premier lancement
+        const joursDepuisPremier = datesObj.map(date => {
+            return Math.floor((date - datesObj[0]) / (1000 * 60 * 60 * 24));
+        });
+
+        // Prendre les 3 derniers points pour la régression
+        const derniersPoints = 3;
+        const derniersJours = joursDepuisPremier.slice(-derniersPoints);
+        const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
+
+        // Fonction pour calculer la régression linéaire
+        function calculerRegression(x, y) {
+            const n = x.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            
+            for (let i = 0; i < n; i++) {
+                sumX += x[i];
+                sumY += y[i];
+                sumXY += x[i] * y[i];
+                sumXX += x[i] * x[i];
+            }
+            
+            const pente = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - pente * sumX) / n;
+            
+            return { pente, intercept };
+        }
+
+        // Calculer la régression avec les 3 derniers points
+        const regression = calculerRegression(derniersJours, derniersY);
+
+        // Prédire les dates jusqu'au 9ème vol
+        const predictions = [];
+        const dernierVol = datesLancements.length;
+        const nombreVolsPredits = 9;
+        const dernierVolTotal = dernierVol + nombreVolsPredits;
+
+        for (let i = dernierVol; i < dernierVolTotal; i++) {
+            const joursPredits = (i - regression.intercept) / regression.pente;
+            const datePredite = new Date(datesObj[0].getTime() + joursPredits * 24 * 60 * 60 * 1000);
+            predictions.push({
+                numero: i + 1,
+                date: datePredite
+            });
+        }
+
+        // Fonction pour formater la date en français
+        function formaterDate(date) {
+            const jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+            const jourSemaine = jours[date.getDay()];
+            const jour = date.getDate();
+            const moisNom = mois[date.getMonth()];
+            const annee = date.getFullYear();
+            return `${jourSemaine} ${jour} ${moisNom} ${annee}`;
+        }
+
+        // Afficher les résultats dans le DOM
+        const datesContainer = document.getElementById('dates-lancements');
+        const predictionsContainer = document.getElementById('predictions');
+
+        datesLancements.forEach((date, index) => {
+            const div = document.createElement('div');
+            div.className = 'date-item';
+            const dateObj = new Date(date);
+            div.textContent = `Vol ${index + 1}: ${formaterDate(dateObj)}`;
+            datesContainer.appendChild(div);
+        });
+
+        predictions.forEach(pred => {
+            const div = document.createElement('div');
+            div.className = 'date-item';
+            div.textContent = `Vol ${pred.numero}: ${formaterDate(pred.date)}`;
+            predictionsContainer.appendChild(div);
+        });
+
+        // Créer le graphique
+        const ctx = document.getElementById('graphique').getContext('2d');
+        new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Lancements réels',
+                    data: datesObj.map((date, index) => ({
+                        x: date,
+                        y: index + 1
+                    })),
+                    backgroundColor: 'blue'
+                }, {
+                    label: 'Prédictions',
+                    data: predictions.map(pred => ({
+                        x: pred.date,
+                        y: pred.numero
+                    })),
+                    backgroundColor: 'red'
+                }, {
+                    label: 'Ligne de tendance',
+                    data: [
+                        {
+                            x: datesObj[datesObj.length - derniersPoints],
+                            y: datesLancements.length - derniersPoints + 1
+                        },
+                        {
+                            x: predictions[predictions.length - 1].date,
+                            y: predictions[predictions.length - 1].numero
+                        }
+                    ],
+                    type: 'line',
+                    borderColor: 'green',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'month',
+                            displayFormats: {
+                                month: 'MMM yyyy'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        },
+                        min: datesObj[0],
+                        max: predictions[predictions.length - 1].date
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Numéro du vol'
+                        },
+                        min: 1,
+                        max: dernierVolTotal,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `Prédiction des lancements du Starship jusqu'au ${dernierVolTotal}ème vol`
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const date = new Date(context.raw.x);
+                                return `Vol ${context.raw.y}: ${formaterDate(date)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
