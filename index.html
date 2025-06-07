@@ -194,7 +194,7 @@
                     })),
                     backgroundColor: 'red'
                 }, {
-                    label: 'Ligne de tendance',
+                    label: 'Ligne de tendance (3 derniers)',
                     data: [
                         {
                             x: datesObj[datesObj.length - derniersPoints],
@@ -208,6 +208,24 @@
                     type: 'line',
                     borderColor: 'green',
                     borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false
+                }, {
+                    label: 'Courbe de régression globale',
+                    data: [
+                        {
+                            x: datesObj[0],
+                            y: 1
+                        },
+                        {
+                            x: predictions[predictions.length - 1].date,
+                            y: predictions[predictions.length - 1].numero
+                        }
+                    ],
+                    type: 'line',
+                    borderColor: 'purple',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false
                 }]
