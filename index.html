@@ -80,8 +80,9 @@
         const datesObj = datesLancements.map(date => new Date(date));
 
         // Calculer les jours depuis le premier lancement
-        const joursDepuisPremier = datesObj.map(date => {
-            return Math.floor((date - datesObj[0]) / (1000 * 60 * 60 * 24));
+        const joursDepuisPremier = datesObj.map((date, index) => {
+            if (index === 0) return 0;
+            return Math.floor((date - datesObj[index - 1]) / (1000 * 60 * 60 * 24));
         });
 
         // Prendre les 3 derniers points pour la régression
