@@ -115,13 +115,33 @@
         const nombreVolsPredits = 9;
         const dernierVolTotal = dernierVol + nombreVolsPredits;
 
+        // Fonction pour mettre à jour la régression avec les nouvelles prédictions
+        function mettreAJourRegression(derniersJours, derniersY) {
+            return calculerRegression(derniersJours, derniersY);
+        }
+
+        // Générer les prédictions en mettant à jour la régression à chaque fois
+        let joursPredits = [...joursDepuisPremier];
+        let yPredits = Array.from({length: datesLancements.length}, (_, i) => i + 1);
+
         for (let i = dernierVol; i < dernierVolTotal; i++) {
-            const joursPredits = (i - regression.intercept) / regression.pente;
-            const datePredite = new Date(datesObj[0].getTime() + joursPredits * 24 * 60 * 60 * 1000);
+            // Calculer la régression avec les 3 derniers points
+            const derniersJoursActuels = joursPredits.slice(-derniersPoints);
+            const derniersYActuels = yPredits.slice(-derniersPoints);
+            const regressionActuelle = mettreAJourRegression(derniersJoursActuels, derniersYActuels);
+
+            // Prédire le prochain vol
+            const joursProchainVol = (i + 1 - regressionActuelle.intercept) / regressionActuelle.pente;
+            const datePredite = new Date(datesObj[0].getTime() + joursProchainVol * 24 * 60 * 60 * 1000);
+            
             predictions.push({
                 numero: i + 1,
                 date: datePredite
             });
+
+            // Mettre à jour les tableaux pour la prochaine itération
+            joursPredits.push(joursProchainVol);
+            yPredits.push(i + 1);
         }
 
         // Fonction pour formater la date en français
