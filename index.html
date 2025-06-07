@@ -183,27 +183,51 @@
             return Math.floor((date2 - date1) / (1000 * 60 * 60 * 24));
         }
 
+        // Fonction pour calculer la date prédite pour un vol donné
+        function calculerDatePredite(numeroVol, regression) {
+            const joursPredits = Math.exp((numeroVol - regression.b) / regression.a);
+            return new Date(datesObj[0].getTime() + joursPredits * 24 * 60 * 60 * 1000);
+        }
+
+        // Calculer les prédictions pour les vols passés
+        const predictionsPassees = [];
+        for (let i = 1; i <= datesLancements.length; i++) {
+            const dateReelle = new Date(datesLancements[i - 1]);
+            const datePredite = calculerDatePredite(i, regression);
+            const ecart = calculerEcartJours(datePredite, dateReelle);
+            predictionsPassees.push({
+                numero: i,
+                dateReelle: dateReelle,
+                datePredite: datePredite,
+                ecart: ecart
+            });
+        }
+
         // Afficher les résultats dans le DOM
         const datesContainer = document.getElementById('dates-lancements');
         const predictionsContainer = document.getElementById('predictions');
 
-        datesLancements.forEach((date, index) => {
+        // Afficher les vols passés avec leurs prédictions
+        predictionsPassees.forEach(pred => {
             const div = document.createElement('div');
             div.className = 'date-item';
-            const dateObj = new Date(date);
-            let texte = `Vol ${index + 1}: ${formaterDate(dateObj)}`;
+            let texte = `Vol ${pred.numero}: ${formaterDate(pred.dateReelle)}`;
             
             // Ajouter l'écart avec le vol précédent
-            if (index > 0) {
-                const datePrecedente = new Date(datesLancements[index - 1]);
-                const ecart = calculerEcartJours(datePrecedente, dateObj);
+            if (pred.numero > 1) {
+                const datePrecedente = new Date(datesLancements[pred.numero - 2]);
+                const ecart = calculerEcartJours(datePrecedente, pred.dateReelle);
                 texte += ` (${ecart} jours après le vol précédent)`;
             }
+            
+            // Ajouter l'écart avec la prédiction
+            texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${pred.ecart} jours]`;
             
             div.textContent = texte;
             datesContainer.appendChild(div);
         });
 
+        // Afficher les prédictions futures
         predictions.forEach((pred, index) => {
             const div = document.createElement('div');
             div.className = 'date-item';
@@ -219,6 +243,19 @@
             div.textContent = texte;
             predictionsContainer.appendChild(div);
         });
+
+        // Calculer la moyenne des écarts absolus
+        const moyenneEcart = Math.round(
+            predictionsPassees.reduce((sum, pred) => sum + Math.abs(pred.ecart), 0) / 
+            predictionsPassees.length
+        );
+
+        // Ajouter un résumé des écarts
+        const divResume = document.createElement('div');
+        divResume.className = 'date-item';
+        divResume.style.fontWeight = 'bold';
+        divResume.textContent = `Moyenne des écarts absolus: ${moyenneEcart} jours`;
+        datesContainer.appendChild(divResume);
 
         // Créer le graphique
         const ctx = document.getElementById('graphique').getContext('2d');
