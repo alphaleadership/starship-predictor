@@ -84,7 +84,7 @@
         });
 
         // Prendre les 3 derniers points pour la régression
-        const derniersPoints = 2;
+        const derniersPoints = Math.round(Math.sqrt(datesLancements.length));
         const derniersJours = joursDepuisPremier.slice(-derniersPoints);
         const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
 
