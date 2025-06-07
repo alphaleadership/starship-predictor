@@ -88,26 +88,27 @@
         const derniersJours = joursDepuisPremier.slice(-derniersPoints);
         const derniersY = Array.from({length: derniersPoints}, (_, i) => datesLancements.length - derniersPoints + i);
 
-        // Fonction pour calculer la régression linéaire
-        function calculerRegression(x, y) {
+        // Fonction pour calculer la régression logarithmique
+        function calculerRegressionLogarithmique(x, y) {
             const n = x.length;
-            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            let sumLnX = 0, sumY = 0, sumLnXY = 0, sumLnX2 = 0;
             
             for (let i = 0; i < n; i++) {
-                sumX += x[i];
+                const lnX = Math.log(x[i]);
+                sumLnX += lnX;
                 sumY += y[i];
-                sumXY += x[i] * y[i];
-                sumXX += x[i] * x[i];
+                sumLnXY += lnX * y[i];
+                sumLnX2 += lnX * lnX;
             }
             
-            const pente = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-            const intercept = (sumY - pente * sumX) / n;
+            const a = (n * sumLnXY - sumLnX * sumY) / (n * sumLnX2 - sumLnX * sumLnX);
+            const b = (sumY - a * sumLnX) / n;
             
-            return { pente, intercept };
+            return { a, b };
         }
 
         // Calculer la régression avec les 3 derniers points
-        const regression = calculerRegression(derniersJours, derniersY);
+        const regression = calculerRegressionLogarithmique(derniersJours, derniersY);
 
         // Prédire les dates jusqu'au 9ème vol
         const predictions = [];
@@ -117,7 +118,7 @@
 
         // Fonction pour mettre à jour la régression avec les nouvelles prédictions
         function mettreAJourRegression(derniersJours, derniersY) {
-            return calculerRegression(derniersJours, derniersY);
+            return calculerRegressionLogarithmique(derniersJours, derniersY);
         }
 
         // Générer les prédictions en mettant à jour la régression à chaque fois
@@ -130,8 +131,8 @@
             const derniersYActuels = yPredits.slice(-derniersPoints);
             const regressionActuelle = mettreAJourRegression(derniersJoursActuels, derniersYActuels);
 
-            // Prédire le prochain vol
-            const joursProchainVol = (i + 1 - regressionActuelle.intercept) / regressionActuelle.pente;
+            // Prédire le prochain vol avec la formule logarithmique: y = a * ln(x) + b
+            const joursProchainVol = Math.exp((i + 1 - regressionActuelle.b) / regressionActuelle.a);
             const datePredite = new Date(datesObj[0].getTime() + joursProchainVol * 24 * 60 * 60 * 1000);
             
             predictions.push({
@@ -142,6 +143,21 @@
             // Mettre à jour les tableaux pour la prochaine itération
             joursPredits.push(joursProchainVol);
             yPredits.push(i + 1);
+        }
+
+        // Fonction pour calculer les points de la courbe de régression
+        function calculerPointsRegression(debut, fin, regression) {
+            const points = [];
+            const pas = (fin - debut) / 100; // 100 points pour une courbe fluide
+            
+            for (let x = debut; x <= fin; x += pas) {
+                const y = regression.a * Math.log(x) + regression.b;
+                points.push({
+                    x: new Date(datesObj[0].getTime() + x * 24 * 60 * 60 * 1000),
+                    y: y
+                });
+            }
+            return points;
         }
 
         // Fonction pour formater la date en français
@@ -194,52 +210,15 @@
                     })),
                     backgroundColor: 'red'
                 }, {
-                    label: 'Ligne de tendance (3 derniers)',
-                    data: [
-                        {
-                            x: datesObj[0],
-                            y: 1
-                        },
-                        {
-                            x: datesObj[datesObj.length - 1],
-                            y: datesLancements.length
-                        },
-                        {
-                            x: predictions[predictions.length - 1].date,
-                            y: predictions[predictions.length - 1].numero
-                        }
-                    ],
+                    label: 'Courbe de régression logarithmique',
+                    data: calculerPointsRegression(
+                        joursDepuisPremier[0],
+                        joursPredits[joursPredits.length - 1],
+                        regression
+                    ),
                     type: 'line',
                     borderColor: 'green',
                     borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    segment: {
-                        borderColor: ctx => {
-                            const points = ctx.p0.parsed.x;
-                            const index = datesObj.findIndex(date => date.getTime() === points);
-                            if (index >= datesObj.length - derniersPoints) {
-                                return 'green';
-                            }
-                            return 'rgba(0, 0, 0, 0.1)';
-                        }
-                    }
-                }, {
-                    label: 'Courbe de régression globale',
-                    data: [
-                        {
-                            x: datesObj[0],
-                            y: 1
-                        },
-                        {
-                            x: predictions[predictions.length - 1].date,
-                            y: predictions[predictions.length - 1].numero
-                        }
-                    ],
-                    type: 'line',
-                    borderColor: 'purple',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false
                 }]
