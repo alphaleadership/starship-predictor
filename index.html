@@ -55,6 +55,9 @@
             <div id="dates-lancements"></div>
             <h2>Prédictions</h2>
             <div id="predictions"></div>
+            <button onclick="ajouterDateVeille()" style="margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Ajouter la date de la veille
+            </button>
         </div>
         <div class="graphique-container">
             <canvas id="graphique"></canvas>
@@ -62,6 +65,14 @@
     </div>
 
     <script>
+        // Fonction pour ajouter la date de la veille
+        function ajouterDateVeille() {
+            const hier = new Date();
+            hier.setDate(hier.getDate() - 1);
+            datesLancements.push(hier.toISOString().split('T')[0]);
+            location.reload();
+        }
+
         // Dates des lancements précédents du Starship
         const datesLancements = [
     '2023-04-20',

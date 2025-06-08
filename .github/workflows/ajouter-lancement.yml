@@ -1,0 +1,27 @@
+name: Ajouter lancement quotidien
+
+on:
+  workflow_dispatch:      # Exécution manuelle uniquement
+
+jobs:
+  ajouter-lancement:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configuration de Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Ajouter la date de la veille
+      run: node ajouter-lancement.js
+      
+    - name: Commit et push des changements
+      run: |
+        git config --global user.name 'GitHub Action'
+        git config --global user.email 'action@github.com'
+        git add index.html
+        git commit -m "Ajout automatique du lancement de la veille" || echo "Pas de changements à commiter"
+        git push 
