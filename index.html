@@ -111,9 +111,14 @@
             return a * (n + 1) + b;
         }
 
+        // Fonction pour calculer l'écart en jours entre deux dates
+        function calculerEcartJours(date1, date2) {
+            return Math.max(1, Math.floor((date2 - date1) / (1000 * 60 * 60 * 24)));
+        }
+
         // Fonction pour calculer la date prédite pour un vol donné
         function calculerDatePredite(numeroVol, datePrecedente) {
-            const prediction = calculerRegressionLogarithmique(derniersJours);
+            const prediction = Math.max(1, calculerRegressionLogarithmique(derniersJours));
             return new Date(datePrecedente.getTime() + prediction * 24 * 60 * 60 * 1000);
         }
 
@@ -147,7 +152,7 @@
         // Prédire les dates futures
         const predictions = [];
         const dernierVol = datesLancements.length;
-        const nombreVolsPredits = 9;
+        const nombreVolsPredits = 3;
         const dernierVolTotal = dernierVol + nombreVolsPredits;
 
         // Générer les prédictions en mettant à jour la moyenne à chaque fois
@@ -210,11 +215,6 @@
             const moisNom = mois[date.getMonth()];
             const annee = date.getFullYear();
             return `${jourSemaine} ${jour} ${moisNom} ${annee}`;
-        }
-
-        // Fonction pour calculer l'écart en jours entre deux dates
-        function calculerEcartJours(date1, date2) {
-            return Math.floor((date2 - date1) / (1000 * 60 * 60 * 24));
         }
 
         // Afficher les résultats dans le DOM
