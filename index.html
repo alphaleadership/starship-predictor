@@ -234,8 +234,8 @@
                 texte += ` (${ecartPrecedent} jours après le vol précédent)`;
             }
             
-            // Ajouter l'écart avec la prédiction seulement à partir du troisième vol
-            if (pred.numero > derniersPoints) {
+            // Ajouter la prédiction seulement à partir du 6ème vol
+            if (pred.numero > 5) {
                 const signeEcart = pred.ecart > 0 ? '+' : '';
                 texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
             }
@@ -280,19 +280,31 @@
             type: 'scatter',
             data: {
                 datasets: [{
-                    label: 'Lancements réels',
-                    data: datesObj.map((date, index) => ({
-                        x: date,
-                        y: index + 1
+                    label: 'Écarts réels entre vols',
+                    data: joursDepuisPrecedent.map((jours, index) => ({
+                        x: index + 1,
+                        y: jours
                     })),
-                    backgroundColor: 'blue'
+                    backgroundColor: 'blue',
+                    showLine: true,
+                    borderColor: 'blue',
+                    pointRadius: 4
                 }, {
-                    label: 'Prédictions',
-                    data: predictions.map(pred => ({
-                        x: pred.date,
-                        y: pred.numero
-                    })),
-                    backgroundColor: 'red'
+                    label: 'Écarts prédits',
+                    data: predictions.map((pred, index) => {
+                        const datePrecedente = index === 0 ? 
+                            datesObj[datesObj.length - 1] : 
+                            predictions[index - 1].date;
+                        const ecart = Math.floor((pred.date - datePrecedente) / (1000 * 60 * 60 * 24));
+                        return {
+                            x: pred.numero,
+                            y: ecart
+                        };
+                    }),
+                    backgroundColor: 'red',
+                    showLine: true,
+                    borderColor: 'red',
+                    pointRadius: 4
                 }]
             },
             options: {
@@ -300,21 +312,6 @@
                 maintainAspectRatio: false,
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            unit: 'month',
-                            displayFormats: {
-                                month: 'MMM yyyy'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Date'
-                        },
-                        min: datesObj[0],
-                        max: predictions[predictions.length - 1].date
-                    },
-                    y: {
                         title: {
                             display: true,
                             text: 'Numéro du vol'
@@ -324,18 +321,24 @@
                         ticks: {
                             stepSize: 1
                         }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Jours entre les vols'
+                        },
+                        min: 0
                     }
                 },
                 plugins: {
                     title: {
                         display: true,
-                        text: `Prédiction des lancements du Starship jusqu'au ${dernierVolTotal}ème vol`
+                        text: `Écarts entre les lancements du Starship jusqu'au ${dernierVolTotal}ème vol`
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                const date = new Date(context.raw.x);
-                                return `Vol ${context.raw.y}: ${formaterDate(date)}`;
+                                return `Vol ${context.raw.x}: ${context.raw.y} jours`;
                             }
                         }
                     }
