@@ -305,6 +305,20 @@
                     showLine: true,
                     borderColor: 'red',
                     pointRadius: 4
+                }, {
+                    label: '',
+                    data: [{
+                        x: dernierVol,
+                        y: joursDepuisPrecedent[joursDepuisPrecedent.length - 1]
+                    }, {
+                        x: dernierVol + 1,
+                        y: Math.floor((predictions[0].date - datesObj[datesObj.length - 1]) / (1000 * 60 * 60 * 24))
+                    }],
+                    backgroundColor: 'rgba(0,255,0,0.5)',
+                    showLine: true,
+                    borderColor: 'green',
+                    pointRadius: 0,
+                    borderWidth: 2
                 }]
             },
             options: {
