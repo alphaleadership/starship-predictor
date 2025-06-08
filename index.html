@@ -58,6 +58,9 @@
             <button onclick="ajouterDateVeille()" style="margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 Ajouter la date de la veille
             </button>
+            <button onclick="ajouterDateAujourdhui()" style="margin-top: 20px; margin-left: 10px; padding: 10px 20px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Ajouter la date d'aujourd'hui
+            </button>
         </div>
         <div class="graphique-container">
             <canvas id="graphique"></canvas>
@@ -65,15 +68,49 @@
     </div>
 
     <script>
-        // Fonction pour ajouter la date de la veille
+        // Fonction pour ajouter la date de la veille et recalculer
         function ajouterDateVeille() {
             const hier = new Date();
             hier.setDate(hier.getDate() - 1);
-            datesLancements.push(hier.toISOString().split('T')[0]);
-            location.reload();
+            const dateHier = hier.toISOString().split('T')[0];
+            
+            // Vérifier si la date existe déjà
+            if (datesLancements.includes(dateHier)) {
+                alert('Cette date existe déjà dans la liste');
+                return;
+            }
+            
+            // Ajouter la nouvelle date
+            datesLancements.push(dateHier);
+            
+            // Recalculer les prédictions
+            calculerPredictions();
+            
+            // Mettre à jour l'affichage
+            mettreAJourAffichage();
         }
 
-        // Dates des lancements précédents du Starship
+        // Fonction pour ajouter la date d'aujourd'hui et recalculer
+        function ajouterDateAujourdhui() {
+            const aujourdhui = new Date();
+            const dateAujourdhui = aujourdhui.toISOString().split('T')[0];
+            
+            // Vérifier si la date existe déjà
+            if (datesLancements.includes(dateAujourdhui)) {
+                alert('Cette date existe déjà dans la liste');
+                return;
+            }
+            
+            // Ajouter la nouvelle date
+            datesLancements.push(dateAujourdhui);
+            
+            // Recalculer les prédictions
+            calculerPredictions();
+            
+            // Mettre à jour l'affichage
+            mettreAJourAffichage();
+        }
+
         const datesLancements = [
     '2023-04-20',
     '2023-11-18',
@@ -88,18 +125,227 @@
 ];
 
         // Convertir les dates en objets Date
-        const datesObj = datesLancements.map(date => new Date(date));
+        let datesObj = datesLancements.map(date => new Date(date));
 
         // Calculer les jours depuis le vol précédent
-        const joursDepuisPrecedent = datesObj.map((date, index) => {
+        let joursDepuisPrecedent = datesObj.map((date, index) => {
             if (index === 0) return 1;
             return Math.max(1, Math.floor((date - datesObj[index - 1]) / (1000 * 60 * 60 * 24)));
         });
 
         // Prendre les derniers points pour la prédiction
-        const derniersPoints = 5;
-        const derniersJours = joursDepuisPrecedent.slice(-derniersPoints);
+        let derniersPoints = 5;
+        let derniersJours = joursDepuisPrecedent.slice(-derniersPoints);
+        let nombreVolsPredits = 3;
+        let dernierVol = datesLancements.length;
+        let dernierVolTotal = dernierVol + nombreVolsPredits;
 
+        calculerPredictions();
+        mettreAJourAffichage();
+
+        // Fonction pour calculer les prédictions
+        function calculerPredictions() {
+            // Convertir les dates en objets Date
+            datesObj = datesLancements.map(date => new Date(date));
+
+            // Calculer les jours depuis le vol précédent
+            joursDepuisPrecedent = datesObj.map((date, index) => {
+                if (index === 0) return 1;
+                return Math.max(1, Math.floor((date - datesObj[index - 1]) / (1000 * 60 * 60 * 24)));
+            });
+
+            // Prendre les derniers points pour la prédiction
+            derniersJours = joursDepuisPrecedent.slice(-derniersPoints);
+
+            // Calculer les prédictions pour les vols passés
+            predictionsPassees = [];
+            for (let i = 1; i <= datesLancements.length; i++) {
+                const dateReelle = new Date(datesLancements[i - 1]);
+                
+                let datePredite;
+                if (i <= derniersPoints) {
+                    datePredite = dateReelle;
+                } else {
+                    const joursPrecedents = joursDepuisPrecedent.slice(0, i - 1).slice(-derniersPoints);
+                    const datePrecedente = new Date(datesLancements[i - 2]);
+                    datePredite = calculerDatePredite(i, datePrecedente);
+                }
+                
+                const ecart = calculerEcartJours(datePredite, dateReelle);
+                predictionsPassees.push({
+                    numero: i,
+                    dateReelle: dateReelle,
+                    datePredite: datePredite,
+                    ecart: ecart
+                });
+            }
+
+            // Prédire les dates futures
+            predictions = [];
+            dernierVol = datesLancements.length;
+            dernierVolTotal = dernierVol + nombreVolsPredits;
+
+            // Utiliser les derniers points réels pour la prédiction
+            let derniersJoursActuels = [...joursDepuisPrecedent].slice(-derniersPoints);
+            let derniereDate = datesObj[datesObj.length - 1];
+
+            for (let i = dernierVol; i < dernierVolTotal; i++) {
+                const moyenneActuelle = Math.max(1, Math.floor(calculerRegressionLogarithmique(derniersJoursActuels)));
+                const datePredite = new Date(derniereDate.getTime() + moyenneActuelle * 24 * 60 * 60 * 1000);
+                
+                // Vérifier que la date prédite est dans le futur
+                if (datePredite <= derniereDate) {
+                    datePredite.setDate(derniereDate.getDate() + 1);
+                }
+                
+                predictions.push({
+                    numero: i + 1,
+                    date: datePredite
+                });
+
+                const joursDepuisDernier = Math.floor((datePredite - derniereDate) / (1000 * 60 * 60 * 24));
+                derniersJoursActuels.push(joursDepuisDernier);
+                derniersJoursActuels = derniersJoursActuels.slice(-derniersPoints);
+                derniereDate = datePredite;
+            }
+        }
+
+        // Fonction pour mettre à jour l'affichage
+        function mettreAJourAffichage() {
+            // Mettre à jour la liste des dates
+            const datesContainer = document.getElementById('dates-lancements');
+            datesContainer.innerHTML = '';
+            
+            predictionsPassees.forEach(pred => {
+                const div = document.createElement('div');
+                div.className = 'date-item';
+                let texte = `Vol ${pred.numero}: ${formaterDate(pred.dateReelle)}`;
+                
+                if (pred.numero > 1) {
+                    const datePrecedente = new Date(datesLancements[pred.numero - 2]);
+                    const ecartPrecedent = calculerEcartJours(datePrecedente, pred.dateReelle);
+                    texte += ` (${ecartPrecedent} jours après le vol précédent)`;
+                }
+                
+                if (pred.numero > 5) {
+                    const signeEcart = pred.ecart > 0 ? '+' : '';
+                    texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
+                }
+                
+                div.textContent = texte;
+                datesContainer.appendChild(div);
+            });
+
+            // Mettre à jour la liste des prédictions
+            const predictionsContainer = document.getElementById('predictions');
+            predictionsContainer.innerHTML = '';
+            
+            predictions.forEach((pred, index) => {
+                const div = document.createElement('div');
+                div.className = 'date-item';
+                let texte = `Vol ${pred.numero}: ${formaterDate(pred.date)}`;
+                
+                const datePrecedente = index === 0 ? 
+                    datesObj[datesObj.length - 1] : 
+                    predictions[index - 1].date;
+                const ecartPrecedent = calculerEcartJours(datePrecedente, pred.date);
+                texte += ` (${ecartPrecedent} jours après le vol précédent)`;
+                
+                div.textContent = texte;
+                predictionsContainer.appendChild(div);
+            });
+
+            // Mettre à jour le graphique
+            const ctx = document.getElementById('graphique').getContext('2d');
+            if (window.monGraphique) {
+                window.monGraphique.destroy();
+            }
+            window.monGraphique = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Écarts réels entre vols',
+                        data: joursDepuisPrecedent.map((jours, index) => ({
+                            x: index + 1,
+                            y: jours
+                        })),
+                        backgroundColor: 'blue',
+                        showLine: true,
+                        borderColor: 'blue',
+                        pointRadius: 4
+                    }, {
+                        label: 'Écarts prédits',
+                        data: predictions.map((pred, index) => {
+                            const datePrecedente = index === 0 ? 
+                                datesObj[datesObj.length - 1] : 
+                                predictions[index - 1].date;
+                            const ecart = Math.floor((pred.date - datePrecedente) / (1000 * 60 * 60 * 24));
+                            return {
+                                x: pred.numero,
+                                y: ecart
+                            };
+                        }),
+                        backgroundColor: 'red',
+                        showLine: true,
+                        borderColor: 'red',
+                        pointRadius: 4
+                    }, {
+                        data: [{
+                            x: dernierVol,
+                            y: joursDepuisPrecedent[joursDepuisPrecedent.length - 1]
+                        }, {
+                            x: dernierVol + 1,
+                            y: Math.floor((predictions[0].date - datesObj[datesObj.length - 1]) / (1000 * 60 * 60 * 24))
+                        }],
+                        backgroundColor: 'rgba(0,255,0,0.5)',
+                        showLine: true,
+                        borderColor: 'green',
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Numéro du vol'
+                            },
+                            min: 1,
+                            max: dernierVolTotal,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Jours entre les vols'
+                            },
+                            min: 0
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Écarts entre les lancements du Starship jusqu'au ${dernierVolTotal}ème vol`
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Vol ${context.raw.x}: ${context.raw.y} jours`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Dates des lancements précédents du Starship
+     
         // Fonction pour calculer la régression logarithmique
         function calculerRegressionLogarithmique(jours) {
             if (jours.length === 0) return 30; // Valeur par défaut
@@ -133,90 +379,6 @@
             return new Date(datePrecedente.getTime() + prediction * 24 * 60 * 60 * 1000);
         }
 
-        // Calculer les prédictions pour les vols passés
-        const predictionsPassees = [];
-        for (let i = 1; i <= datesLancements.length; i++) {
-            const dateReelle = new Date(datesLancements[i - 1]);
-            
-            // Calculer la prédiction basée sur les vols précédents
-            let datePredite;
-            if (i <= derniersPoints) {
-                // Pas de prédiction pour les premiers vols
-                datePredite = dateReelle;
-            } else {
-                // Pour les vols suivants, utiliser les derniers points disponibles
-                const joursPrecedents = joursDepuisPrecedent.slice(0, i - 1).slice(-derniersPoints);
-                const datePrecedente = new Date(datesLancements[i - 2]);
-                datePredite = calculerDatePredite(i, datePrecedente);
-            }
-            
-            // Calculer l'écart entre la date réelle et la date prédite
-            const ecart = calculerEcartJours(datePredite, dateReelle);
-            predictionsPassees.push({
-                numero: i,
-                dateReelle: dateReelle,
-                datePredite: datePredite,
-                ecart: ecart
-            });
-        }
-
-        // Prédire les dates futures
-        const predictions = [];
-        const dernierVol = datesLancements.length;
-        const nombreVolsPredits = 3;
-        const dernierVolTotal = dernierVol + nombreVolsPredits;
-
-        // Générer les prédictions en mettant à jour la moyenne à chaque fois
-        let derniersJoursActuels = [...joursDepuisPrecedent];
-        let datesActuelles = [...datesObj];
-
-        for (let i = dernierVol; i < dernierVolTotal; i++) {
-            // Calculer la moyenne pondérée avec les derniers points
-            const derniersJoursPrediction = derniersJoursActuels.slice(-derniersPoints);
-            const moyenneActuelle = calculerRegressionLogarithmique(derniersJoursPrediction);
-
-            // Prédire le prochain vol
-            const datePrecedente = i === dernierVol ? 
-                datesActuelles[datesActuelles.length - 1] : 
-                predictions[predictions.length - 1].date;
-            const datePredite = new Date(datePrecedente.getTime() + moyenneActuelle * 24 * 60 * 60 * 1000);
-            
-            predictions.push({
-                numero: i + 1,
-                date: datePredite
-            });
-
-            // Mettre à jour les tableaux pour la prochaine itération
-            const joursDepuisDernier = Math.floor((datePredite - datePrecedente) / (1000 * 60 * 60 * 24));
-            derniersJoursActuels.push(joursDepuisDernier);
-            datesActuelles.push(datePredite);
-        }
-
-        // Fonction pour calculer les points de la courbe de tendance
-        function calculerPointsTendance(debut, fin, datePrecedente) {
-            const points = [];
-            const dateDebut = new Date(datePrecedente);
-            const dateFin = new Date(predictions[predictions.length - 1].date);
-            const totalJours = Math.ceil((dateFin - dateDebut) / (1000 * 60 * 60 * 24));
-            
-            // Créer une courbe logarithmique
-            for (let i = 0; i <= 100; i++) {
-                const progression = i / 100;
-                // Utiliser une fonction logarithmique pour la progression
-                const logProgression = Math.log(1 + progression * (Math.E - 1)) / Math.log(Math.E);
-                const joursDepuisDebut = Math.floor(totalJours * logProgression);
-                const datePoint = new Date(dateDebut.getTime() + joursDepuisDebut * 24 * 60 * 60 * 1000);
-                const valeurY = debut + (fin - debut) * logProgression;
-                
-                points.push({
-                    x: datePoint,
-                    y: valeurY
-                });
-            }
-            
-            return points;
-        }
-
         // Fonction pour formater la date en français
         function formaterDate(date) {
             const jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -227,149 +389,6 @@
             const annee = date.getFullYear();
             return `${jourSemaine} ${jour} ${moisNom} ${annee}`;
         }
-
-        // Afficher les résultats dans le DOM
-        const datesContainer = document.getElementById('dates-lancements');
-        const predictionsContainer = document.getElementById('predictions');
-
-        // Afficher les vols passés avec leurs prédictions
-        predictionsPassees.forEach(pred => {
-            const div = document.createElement('div');
-            div.className = 'date-item';
-            let texte = `Vol ${pred.numero}: ${formaterDate(pred.dateReelle)}`;
-            
-            // Ajouter l'écart avec le vol précédent
-            if (pred.numero > 1) {
-                const datePrecedente = new Date(datesLancements[pred.numero - 2]);
-                const ecartPrecedent = calculerEcartJours(datePrecedente, pred.dateReelle);
-                texte += ` (${ecartPrecedent} jours après le vol précédent)`;
-            }
-            
-            // Ajouter la prédiction seulement à partir du 6ème vol
-            if (pred.numero > 5) {
-                const signeEcart = pred.ecart > 0 ? '+' : '';
-                texte += ` [Prédiction: ${formaterDate(pred.datePredite)}, écart: ${signeEcart}${pred.ecart} jours]`;
-            }
-            
-            div.textContent = texte;
-            datesContainer.appendChild(div);
-        });
-
-        // Afficher les prédictions futures
-        predictions.forEach((pred, index) => {
-            const div = document.createElement('div');
-            div.className = 'date-item';
-            let texte = `Vol ${pred.numero}: ${formaterDate(pred.date)}`;
-            
-            // Ajouter l'écart avec le vol précédent
-            const datePrecedente = index === 0 ? 
-                new Date(datesLancements[datesLancements.length - 1]) : 
-                predictions[index - 1].date;
-            const ecartPrecedent = calculerEcartJours(datePrecedente, pred.date);
-            texte += ` (${ecartPrecedent} jours après le vol précédent)`;
-            
-            div.textContent = texte;
-            predictionsContainer.appendChild(div);
-        });
-
-        // Calculer la moyenne des écarts absolus
-        const moyenneEcart = Math.round(
-            predictionsPassees.reduce((sum, pred) => sum + Math.abs(pred.ecart), 0) / 
-            predictionsPassees.length
-        );
-
-        // Ajouter un résumé des écarts
-        const divResume = document.createElement('div');
-        divResume.className = 'date-item';
-        divResume.style.fontWeight = 'bold';
-        divResume.textContent = `Moyenne des écarts absolus: ${moyenneEcart} jours`;
-        datesContainer.appendChild(divResume);
-
-        // Créer le graphique
-        const ctx = document.getElementById('graphique').getContext('2d');
-        new Chart(ctx, {
-            type: 'scatter',
-            data: {
-                datasets: [{
-                    label: 'Écarts réels entre vols',
-                    data: joursDepuisPrecedent.map((jours, index) => ({
-                        x: index + 1,
-                        y: jours
-                    })),
-                    backgroundColor: 'blue',
-                    showLine: true,
-                    borderColor: 'blue',
-                    pointRadius: 4
-                }, {
-                    label: 'Écarts prédits',
-                    data: predictions.map((pred, index) => {
-                        const datePrecedente = index === 0 ? 
-                            datesObj[datesObj.length - 1] : 
-                            predictions[index - 1].date;
-                        const ecart = Math.floor((pred.date - datePrecedente) / (1000 * 60 * 60 * 24));
-                        return {
-                            x: pred.numero,
-                            y: ecart
-                        };
-                    }),
-                    backgroundColor: 'red',
-                    showLine: true,
-                    borderColor: 'red',
-                    pointRadius: 4
-                }, {
-                    label: '',
-                    data: [{
-                        x: dernierVol,
-                        y: joursDepuisPrecedent[joursDepuisPrecedent.length - 1]
-                    }, {
-                        x: dernierVol + 1,
-                        y: Math.floor((predictions[0].date - datesObj[datesObj.length - 1]) / (1000 * 60 * 60 * 24))
-                    }],
-                    backgroundColor: 'rgba(0,255,0,0.5)',
-                    showLine: true,
-                    borderColor: 'green',
-                    pointRadius: 0,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Numéro du vol'
-                        },
-                        min: 1,
-                        max: dernierVolTotal,
-                        ticks: {
-                            stepSize: 1
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Jours entre les vols'
-                        },
-                        min: 0
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `Écarts entre les lancements du Starship jusqu'au ${dernierVolTotal}ème vol`
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `Vol ${context.raw.x}: ${context.raw.y} jours`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
     </script>
 </body>
 </html> 

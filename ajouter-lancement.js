@@ -18,7 +18,13 @@ fs.readFile('index.html', 'utf8', (err, data) => {
 
     if (match) {
         // Extraire les dates existantes
-        const datesExistantes = match[1].split(',').map(date => date.trim());
+        const datesExistantes = match[1].split(',').map(date => date.trim()).filter(date => date);
+        
+        // Vérifier si la date existe déjà
+        if (datesExistantes.includes(`'${dateHier}'`)) {
+            console.log('Cette date existe déjà dans la liste');
+            return;
+        }
         
         // Ajouter la nouvelle date
         datesExistantes.push(`'${dateHier}'`);
@@ -36,6 +42,11 @@ fs.readFile('index.html', 'utf8', (err, data) => {
                 return;
             }
             console.log('Date ajoutée avec succès:', dateHier);
+            
+            // Recharger la page
+            console.log('Rechargement de la page...');
+            // Note: Le rechargement de la page doit être géré côté client
+            // car Node.js ne peut pas recharger une page web directement
         });
     } else {
         console.error('Impossible de trouver le tableau des dates de lancement');
