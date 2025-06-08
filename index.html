@@ -89,23 +89,32 @@
         const derniersPoints = 5;
         const derniersJours = joursDepuisPrecedent.slice(-derniersPoints);
 
-        // Fonction pour calculer la moyenne pondérée des derniers écarts
-        function calculerMoyennePonderee(jours) {
+        // Fonction pour calculer la régression logarithmique
+        function calculerRegressionLogarithmique(jours) {
             if (jours.length === 0) return 30; // Valeur par défaut
             
-            // Donner plus de poids aux écarts récents
-            const poids = jours.map((_, index) => Math.abs(jours[index] - (index > 0 ? jours[index - 1] : jours[0])));
-            const sommePoids = poids.reduce((a, b) => a + b, 0);
+            const n = jours.length;
+            const x = Array.from({length: n}, (_, i) => i + 1);
+            const y = jours;
             
-            return jours.reduce((acc, jour, index) => {
-                return acc + (jour * poids[index] / sommePoids);
-            }, 0);
+            // Calculer les sommes pour la régression
+            const sumX = x.reduce((a, b) => a + b, 0);
+            const sumY = y.reduce((a, b) => a + b, 0);
+            const sumXY = x.reduce((a, b, i) => a + b * y[i], 0);
+            const sumX2 = x.reduce((a, b) => a + b * b, 0);
+            
+            // Calculer les coefficients de la régression
+            const a = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const b = (sumY - a * sumX) / n;
+            
+            // Retourner la prédiction pour le prochain point
+            return a * (n + 1) + b;
         }
 
         // Fonction pour calculer la date prédite pour un vol donné
         function calculerDatePredite(numeroVol, datePrecedente) {
-            const moyennePonderee = calculerMoyennePonderee(derniersJours);
-            return new Date(datePrecedente.getTime() + moyennePonderee * 24 * 60 * 60 * 1000);
+            const prediction = calculerRegressionLogarithmique(derniersJours);
+            return new Date(datePrecedente.getTime() + prediction * 24 * 60 * 60 * 1000);
         }
 
         // Calculer les prédictions pour les vols passés
@@ -138,20 +147,21 @@
         // Prédire les dates futures
         const predictions = [];
         const dernierVol = datesLancements.length;
-        const nombreVolsPredits = 1;
+        const nombreVolsPredits = 9;
         const dernierVolTotal = dernierVol + nombreVolsPredits;
 
         // Générer les prédictions en mettant à jour la moyenne à chaque fois
         let derniersJoursActuels = [...joursDepuisPrecedent];
+        let datesActuelles = [...datesObj];
 
         for (let i = dernierVol; i < dernierVolTotal; i++) {
             // Calculer la moyenne pondérée avec les derniers points
             const derniersJoursPrediction = derniersJoursActuels.slice(-derniersPoints);
-            const moyenneActuelle = calculerMoyennePonderee(derniersJoursPrediction);
+            const moyenneActuelle = calculerRegressionLogarithmique(derniersJoursPrediction);
 
             // Prédire le prochain vol
             const datePrecedente = i === dernierVol ? 
-                new Date(datesLancements[datesLancements.length - 1]) : 
+                datesActuelles[datesActuelles.length - 1] : 
                 predictions[predictions.length - 1].date;
             const datePredite = new Date(datePrecedente.getTime() + moyenneActuelle * 24 * 60 * 60 * 1000);
             
@@ -163,27 +173,31 @@
             // Mettre à jour les tableaux pour la prochaine itération
             const joursDepuisDernier = Math.floor((datePredite - datePrecedente) / (1000 * 60 * 60 * 24));
             derniersJoursActuels.push(joursDepuisDernier);
+            datesActuelles.push(datePredite);
         }
 
         // Fonction pour calculer les points de la courbe de tendance
         function calculerPointsTendance(debut, fin, datePrecedente) {
             const points = [];
-            const pas = (fin - debut) / 100; // 100 points pour une courbe fluide
-            const moyennePonderee = calculerMoyennePonderee(derniersJours);
+            const dateDebut = new Date(datePrecedente);
+            const dateFin = new Date(predictions[predictions.length - 1].date);
+            const totalJours = Math.ceil((dateFin - dateDebut) / (1000 * 60 * 60 * 24));
             
-            // Commencer exactement au point précédent
-            points.push({
-                x: datePrecedente,
-                y: debut
-            });
-            
-            // Ajouter les points intermédiaires
-            for (let x = debut + pas; x <= fin; x += pas) {
+            // Créer une courbe logarithmique
+            for (let i = 0; i <= 100; i++) {
+                const progression = i / 100;
+                // Utiliser une fonction logarithmique pour la progression
+                const logProgression = Math.log(1 + progression * (Math.E - 1)) / Math.log(Math.E);
+                const joursDepuisDebut = Math.floor(totalJours * logProgression);
+                const datePoint = new Date(dateDebut.getTime() + joursDepuisDebut * 24 * 60 * 60 * 1000);
+                const valeurY = debut + (fin - debut) * logProgression;
+                
                 points.push({
-                    x: new Date(datePrecedente.getTime() + moyennePonderee * 24 * 60 * 60 * 1000),
-                    y: x
+                    x: datePoint,
+                    y: valeurY
                 });
             }
+            
             return points;
         }
 
@@ -279,18 +293,6 @@
                         y: pred.numero
                     })),
                     backgroundColor: 'red'
-                }, {
-                    label: 'Courbe de tendance',
-                    data: calculerPointsTendance(
-                        joursDepuisPrecedent[0],
-                        joursDepuisPrecedent[joursDepuisPrecedent.length - 1],
-                        datesObj[0]
-                    ),
-                    type: 'line',
-                    borderColor: 'green',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false
                 }]
             },
             options: {
